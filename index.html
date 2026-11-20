@@ -1,0 +1,63 @@
+ <!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free Clip Cutter</title>
+<style>
+  body{font-family:sans-serif;max-width:600px;margin:auto;padding:16px}
+  video{width:100%;border-radius:8px;margin-top:12px}
+  input,button{width:100%;padding:12px;margin-top:10px;font-size:16px;box-sizing:border-box}
+  button{background:#2563eb;color:#fff;border:0;border-radius:8px}
+  #status{margin-top:10px;color:#555}
+</style>
+</head>
+<body>
+<h2>Free Video Clip Cutter</h2>
+<input type="file" id="file" accept="video/*">
+<video id="preview" controls></video>
+<input type="number" id="start" placeholder="Start (seconds)" step="0.1">
+<input type="number" id="end" placeholder="End (seconds)" step="0.1">
+<button id="cut">Clip Kaato</button>
+<p id="status"></p>
+<video id="result" controls style="display:none"></video>
+<a id="dl" download="clip.mp4"></a>
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script>
+const { createFFmpeg, fetchFile } = FFmpeg;
+const ffmpeg = createFFmpeg({ log: false,
+  corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js' });
+const $ = id => document.getElementById(id);
+let file;
+
+$('file').onchange = e => {
+  file = e.target.files[0];
+  $('preview').src = URL.createObjectURL(file);
+};
+$('preview').onloadedmetadata = () => {
+  $('start').value = 0;
+  $('end').value = Math.min(30, $('preview').duration).toFixed(1);
+};
+
+$('cut').onclick = async () => {
+  if (!file) return alert('Pehle video chuno');
+  const s = parseFloat($('start').value), e = parseFloat($('end').value);
+  if (isNaN(s) || isNaN(e) || e <= s) return alert('Time sahi daalo');
+  $('status').textContent = 'Load ho raha hai, thoda ruko...';
+  if (!ffmpeg.isLoaded()) await ffmpeg.load();
+  ffmpeg.FS('writeFile', 'in.mp4', await fetchFile(file));
+  $('status').textContent = 'Clip ban rahi hai...';
+  await ffmpeg.run('-ss', String(s), '-i', 'in.mp4', '-t', String(e - s),
+                   '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'aac', 'out.mp4');
+  const data = ffmpeg.FS('readFile', 'out.mp4');
+  const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+  $('result').src = url; $('result').style.display = 'block';
+  const a = $('dl'); a.href = url; a.textContent = '⬇ Clip Download Karo';
+  a.style.cssText = 'display:block;margin-top:10px;padding:12px;background:#16a34a;color:#fff;text-align:center;border-radius:8px;text-decoration:none';
+  $('status').textContent = 'Ho gaya! ✅';
+  ffmpeg.FS('unlink', 'in.mp4'); ffmpeg.FS('unlink', 'out.mp4');
+};
+</script>
+</body>
+</html>
